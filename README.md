@@ -202,10 +202,141 @@ El bucle de ejecución se basa en el ciclo clásico de los Agentes ReAct:
 
 ## 💻 Ejemplo de Flujo Interno
 
-```text
+````
+text
 👤 Usuario: ¿Cómo salió el partido de Estados Unidos contra Paraguay anoche en el mundial?
 ⏳ El agente evalúa la línea temporal del corte de conocimiento...
 🧠 Pensamiento: "No poseo el resultado en mi base de datos fija. Debo ejecutar Tavily."
 🔧 Acción: web_search_tool.invoke("resultado Estados Unidos vs Paraguay mundial 2026")
 📄 Observación: { "results": [{"url": "...", "content": "..."}] }
 🤖 Respuesta Final: [Reporte Deportivo Redactado] + Sección de Fuentes con enlaces verificados.
+````
+
+## 📚 Agente de Búsqueda Científica Inteligente con LangGraph
+
+![GitHub License](https://img.shields.io/github/license/cris959/agentes-ai-langraph?color=blue&style=flat-square)
+![Python Version](https://img.shields.io/badge/python-3.12-brightgreen?style=flat-square)
+![Framework](https://img.shields.io/badge/framework-LangGraph-orange?style=flat-square)    
+
+Este proyecto implementa un Sistema Multi-Agente orquestado con LangGraph y motorizado por Gemini 2.5 Flash. La aplicación optimiza costos de infraestructura mediante un ruteo determinista en Python y expone una interfaz visual interactiva utilizando Gradio.
+
+El objetivo principal es resolver consultas de usuarios decidiendo dinámicamente si se requiere una búsqueda avanzada de papers científicos en la API de arXiv o si se puede resolver mediante el conocimiento general del modelo, unificando los resultados en un reporte final estructurado.
+
+## 🏗️ Arquitectura del Sistema
+A diferencia de los agentes ReAct tradicionales y lineales, este sistema utiliza un grafo de estados condicional (StateGraph) para controlar el flujo de ejecución de forma eficiente:
+
+````
+Plaintext
+                        ┌──> [Investigador Node] ──> [Redactor Node] ──> [END]
+                        │         (API arXiv)             (LLM Report)
+[START] ──> [Ruteador] ─┤
+             (Python)   │
+                        └──> [Asistente Casual Node] ────────────────────> [END]
+                                  (LLM Chat)
+````
+1- START: El usuario ingresa su consulta a través de la interfaz.
+
+2- Ruteador Determinar (Middleware): Una función pura en Python analiza la consulta mediante palabras clave. Si detecta intención científica, desvía el flujo al nodo de investigación; si es charla o teoría general, lo manda al nodo casual. Esto ahorra un 33% de llamadas al LLM por ejecución, protegiendo la cuota de la API.
+
+3- Investigador Node: Consume de forma nativa la API pública de arXiv usando urllib (evitando conflictos de dependencias de librerías de terceros) y extrae títulos y abstracts.
+
+4- Redactor Node: Toma la información cruda del estado y el LLM genera un informe final unificado y formateado en Markdown.
+
+5- Asistente Casual Node: Responde directamente consultas generales sin tocar herramientas externas.
+
+## 🛠️ Tecnologías Utilizadas
+* Core AI: LangChain & LangGraph (Orquestación de agentes).
+
+* LLM: Google Gemini 2.5 Flash (langchain-google-genai).
+
+* UI Framework: Gradio (Interfaz de usuario localizada al castellano).
+
+* Backend Tools: Python Nativo (urllib, xml.etree.ElementTree) para el consumo de la API de arXiv.
+
+## 🚀 Instalación y Configuración
+Para correr este proyecto en tu entorno local o en Google Colab, asegurate de instalar las versiones estables compatibles para evitar conflictos con los servidores web internos:
+
+````
+Bash
+
+# Instalación de dependencias de IA
+pip install -qU langchain-google-genai langgraph langchain-core
+
+# Instalación del ecosistema de servidores y UI (Versiones Blindadas)
+pip install -qU starlette==0.49.1 fastapi gradio
+````
+
+## Variables de Entorno
+Configurá tu API Key de Google AI Studio antes de iniciar el grafo:
+
+````
+Python
+import os
+os.environ["GOOGLE_API_KEY"] = "TU_GEMINI_API_KEY"
+````
+
+## 💻 Estructura del Código Principal
+El corazón del proyecto radica en la abstracción de la herramienta nativa y la compilación del flujo de trabajo:
+````
+Python
+# Herramienta nativa de parsing XML para arXiv
+@tool
+def tool_cientifica(query: str) -> str:
+    """Busca artículos científicos en arXiv y retorna sus títulos y resúmenes."""
+    # ... (Lógica de consumo con urllib y parsing ET)
+````    
+La definición de las conexiones de nuestro Grafo de Estados se configura de la siguiente manera:
+
+````
+Python
+workflow_inteligente = StateGraph(EstructuraEstado)
+
+# Registro de Nodos
+workflow_inteligente.add_node("investigador_node", agente_investigador)
+workflow_inteligente.add_node("redactor_node", agente_redactor)
+workflow_inteligente.add_node("casual_node", agente_casual)
+
+# Ruteo Condicional Eficiente (0% Costo de API)
+workflow_inteligente.add_conditional_edges(
+    START,
+    ruteador_inteligente,
+    {
+        "ir_a_investigar": "investigador_node",
+        "ir_a_charla": "casual_node"
+    }
+)
+
+# Conexiones Fijas
+workflow_inteligente.add_edge("investigador_node", "redactor_node")
+workflow_inteligente.add_edge("redactor_node", END)
+workflow_inteligente.add_edge("casual_node", END)
+
+app_con_ruteador = workflow_inteligente.compile()
+````
+
+## 🖥️ Interfaz de Usuario (Gradio)
+La aplicación incluye una interfaz web limpia con sus controles completamente en castellano:
+
+* Enviar Consulta: Procesa el grafo y devuelve la respuesta en formato Markdown enriquecido.
+
+* Limpiar: Resetea el cuadro de diálogo.
+
+````
+Python
+iface = gr.Interface(
+    fn=run_graph,
+    inputs=gr.Textbox(lines=3, label="Escribe tu pregunta:"),
+    outputs=gr.Markdown(label="Respuesta del Agente Científico"),
+    title="📚 Agente de Búsqueda Científica Inteligente",
+    submit_btn="Enviar Consulta",
+    clear_btn="Limpiar",
+    flagging_mode="never"
+)
+iface.launch(share=True)
+````
+
+## 📝 Licencia
+
+Este proyecto está bajo la Licencia MIT. Para más detalles, consulta el archivo [LICENSE](https://github.com/cris959/agentes-ai-langraph/blob/main/LICENSE) adjunto en este repositorio.
+
+Copyright © 2026 [Christian Garay](https://github.com//cris959/agentes-ai-langraph) - Backend Developer.
