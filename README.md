@@ -168,13 +168,16 @@ En su lugar, el proyecto utiliza el gestor de secretos nativo de Google Colab:
 
 El backend del proyecto inyectará automáticamente estas claves en las variables de entorno del sistema operativo utilizando la librería `google.colab.userdata`:
 
-```python
+````
+python
 import os
 from google.colab import userdata
 
 # Inyección automatizada y segura en el entorno de ejecución
 os.environ["TAVILY_API_KEY"] = userdata.get("TAVILY_API_KEY")
 os.environ["GOOGLE_API_KEY"] = userdata.get("GEMINI_KEY")
+````
+
 
 ## 🚀 Arquitectura del Sistema
 
