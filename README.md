@@ -140,3 +140,72 @@ Para evitar bloqueos por consumo de recursos (**RESOURCE_EXHAUSTED**), tener en 
 * 15 solicitudes por minuto (RPM). Nota: Si usas bucles automatizados, agrega un retraso con time.sleep() para evitar saturar el canal.
 
 * 1.000.000 de tokens por minuto (TPM).
+
+# Agente Autónomo de Consulta en Tiempo Real con LangGraph y Gemini 2.5
+
+Este proyecto implementa un agente de inteligencia artificial autónomo utilizando el patrón de arquitectura **ReAct (Reasoning and Acting)**. La solución combina las capacidades de razonamiento avanzado de **Gemini 2.5 Flash** con la potencia del motor de búsqueda web de **Tavily API**, permitiendo responder a consultas de usuarios con datos actualizados en tiempo real mediante un flujo de ejecución dinámico orquestado por **LangGraph**.
+
+
+## 🔑 Configuración del Entorno y Obtención de API Keys
+
+Para que el agente pueda autenticarse con los servicios externos, es necesario dar de alta las credenciales de los proveedores de IA y búsqueda en la web.
+
+### 1. Obtención de la API Key de Tavily
+1. Ingresa al sitio oficial de desarrolladores en [Tavily AI (https://tavily.com)](https://tavily.com).
+2. Regístrate o inicia sesión (puedes vincular directamente tu cuenta de GitHub).
+3. Ve al panel principal (*Dashboard*) y en la sección **API Keys** copia la clave pública generada automáticamente en tu plan gratuito (*Free Tier* de 1,000 búsquedas mensuales).
+
+### 2. Almacenamiento Seguro en Google Colab
+Por motivos de seguridad y para evitar la filtración accidental de credenciales en los *commits* de GitHub, **no se deben escribir las API Keys directamente en el código de las celdas**. 
+
+En su lugar, el proyecto utiliza el gestor de secretos nativo de Google Colab:
+
+1. En el menú lateral izquierdo de tu cuaderno de Colab, haz clic en el icono de la **llave de seguridad (Secrets / Secretos)**.
+2. Agrega una nueva variable con el nombre exacto: `TAVILY_API_KEY`.
+3. En el campo *Value*, pega la clave que copiaste desde el panel de Tavily.
+4. Asegúrate de activar el interruptor de **Acceso al cuaderno (Notebook access)** para que el entorno de Python pueda consumir la variable en tiempo de ejecución.
+5. Repite el mismo proceso para tu credencial de Gemini bajo el nombre `GEMINI_KEY`.
+
+El backend del proyecto inyectará automáticamente estas claves en las variables de entorno del sistema operativo utilizando la librería `google.colab.userdata`:
+
+```python
+import os
+from google.colab import userdata
+
+# Inyección automatizada y segura en el entorno de ejecución
+os.environ["TAVILY_API_KEY"] = userdata.get("TAVILY_API_KEY")
+os.environ["GOOGLE_API_KEY"] = userdata.get("GEMINI_KEY")
+
+## 🚀 Arquitectura del Sistema
+
+A diferencia de los scripts secuenciales rígidos, este desarrollo implementa un agente capaz de decidir de forma autónoma si requiere buscar información externa o si puede responder directamente desde su base de conocimiento integrada.
+
+El bucle de ejecución se basa en el ciclo clásico de los Agentes ReAct:
+1. **Pensamiento (Thought):** El modelo analiza el prompt del usuario y evalúa si necesita herramientas adicionales para cumplir el objetivo.
+2. **Acción (Action):** Si requiere datos en tiempo real (por ejemplo, resultados deportivos recientes, noticias de última hora), invoca autónomamente la herramienta `web_search_tool` (Tavily).
+3. **Observación (Observation):** El agente recibe el JSON crudo con los resultados de la web, extrae el contenido semántico relevante y las fuentes correspondientes.
+4. **Respuesta Final (Final Answer):** Se consolida un reporte en lenguaje natural enriquecido con citas directas y enlaces de referencia.
+
+## 🛠️ Tecnologías y Librerías Utilizadas
+
+* **Python 3.12** (Entorno de ejecución en Google Colab)
+* **Google Gemini 2.5 Flash** (Modelo Fundacional de Lenguaje Principal)
+* **LangGraph (v1.0+)**: Orquestador del ciclo de vida y manejo del estado del agente autónomo (`create_react_agent`).
+* **LangChain Google GenAI (`ChatGoogleGenerativeAI`)**: Puente de conexión moderno para interactuar con la API de Google de forma estructurada.
+* **Tavily Search API**: Herramienta optimizada para LLMs encargada del web scraping y la extracción de fuentes limpias.
+
+## 📦 Características Destacadas e Inyecciones de Comportamiento
+
+* **Autonomía Decisoria:** El modelo consume recursos de búsqueda en internet de manera inteligente, evitando consultas redundantes para preguntas de cultura general.
+* **Transparencia en Fuentes (Citations):** Se implementó una regla de negocio inyectada directamente en el flujo conversacional (`messages`) que obliga al agente a estructurar de forma estricta una sección de **"Fuentes consultadas"** con los hipervínculos exactos de donde extrajo los datos (por ejemplo, reportajes de ESPN, El País o Sofascore).
+* **Robustez ante Cambios de API:** El backend está diseñado utilizando la sintaxis de mensajes nativa de LangGraph, previniendo errores comunes de firmas depreciadas como `state_modifier` o wrappers antiguos de agentes centralizados de LangChain.
+
+## 💻 Ejemplo de Flujo Interno
+
+```text
+👤 Usuario: ¿Cómo salió el partido de Estados Unidos contra Paraguay anoche en el mundial?
+⏳ El agente evalúa la línea temporal del corte de conocimiento...
+🧠 Pensamiento: "No poseo el resultado en mi base de datos fija. Debo ejecutar Tavily."
+🔧 Acción: web_search_tool.invoke("resultado Estados Unidos vs Paraguay mundial 2026")
+📄 Observación: { "results": [{"url": "...", "content": "..."}] }
+🤖 Respuesta Final: [Reporte Deportivo Redactado] + Sección de Fuentes con enlaces verificados.
